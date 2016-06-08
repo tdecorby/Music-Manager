@@ -21,11 +21,16 @@ namespace WindowsFormsApplication1
             
             bool removedSong = false;
             
-
+            storedSongs = new Dictionary<string, List<string>> { };
             foreach (String file in System.IO.Directory.GetFiles(@dir.Key, "*.*", System.IO.SearchOption.AllDirectories))
             {
                 FileInfo f = new FileInfo(file);
-                if (String.Compare(f.Extension, ".mp3", StringComparison.OrdinalIgnoreCase) == 0 || String.Compare(f.Extension, ".wav", StringComparison.OrdinalIgnoreCase) == 0 || String.Compare(f.Extension, ".flac", StringComparison.OrdinalIgnoreCase) == 0)
+                if (String.Compare(f.Extension, ".mp3", StringComparison.OrdinalIgnoreCase) == 0 
+                    || String.Compare(f.Extension, ".wav", StringComparison.OrdinalIgnoreCase) == 0 
+                    || String.Compare(f.Extension, ".flac", StringComparison.OrdinalIgnoreCase) == 0 
+                    //|| String.Compare(f.Extension, ".aiff", StringComparison.OrdinalIgnoreCase) == 0
+                    || String.Compare(f.Extension, ".m4a", StringComparison.OrdinalIgnoreCase) == 0)
+                    //|| String.Compare(f.Extension, ".ogg", StringComparison.OrdinalIgnoreCase) == 0)
                 {
                     foreach (String rsong in dir.Value)
                     {
@@ -35,35 +40,54 @@ namespace WindowsFormsApplication1
                     if (!removedSong)
                     {
                         TagLib.File meta = TagLib.File.Create(f.FullName);
-                        dgv.Rows.Add(meta.Tag.Title, meta.Tag.FirstAlbumArtist, meta.Tag.Album, meta.Tag.Year, meta.Tag.Track, meta.Tag.FirstGenre, Math.Round(f.Length / 1048576.0, 2) + " Mb", f.FullName, dir.Key);
-                        //if (!System.IO.File.Exists(storedSongsLoc))
-                            storedSongs.Add(f.FullName, new List<string> { meta.Tag.Title, meta.Tag.FirstAlbumArtist, meta.Tag.Album, meta.Tag.FirstGenre, meta.Tag.Track.ToString(), meta.Tag.Year.ToString(), Math.Round(f.Length / 1048576.0, 2) + " Mb", dir.Key });
+                        TimeSpan t = TimeSpan.FromMilliseconds(meta.Properties.Duration.TotalMilliseconds);
+                        dgv.Rows.Add(meta.Tag.Title, 
+                            meta.Tag.FirstAlbumArtist, 
+                            meta.Tag.Album,
+                            meta.Tag.FirstGenre,
+                            meta.Tag.Track,
+                            meta.Tag.Year,
+                            Math.Round(f.Length / 1048576.0, 2) + " Mb", 
+                            f.FullName, 
+                            dir.Key, 
+                            string.Format("{0:D2}:{1:D2}", t.Minutes, t.Seconds));
+                        
+                            storedSongs.Add(f.FullName, new List<string> {
+                                meta.Tag.Title,
+                                meta.Tag.FirstAlbumArtist,
+                                meta.Tag.Album,
+                                meta.Tag.FirstGenre,
+                                meta.Tag.Track.ToString(),
+                                meta.Tag.Year.ToString(),
+                                Math.Round(f.Length / 1048576.0, 2) + " Mb",
+                                dir.Key,
+                                string.Format("{0:D2}:{1:D2}", t.Minutes, t.Seconds) });
                     }
                     removedSong = false;
                 }
                 
             }
-            if (!System.IO.File.Exists(storedSongsLoc))
-            {
+           // if (!System.IO.File.Exists(storedSongsLoc))
+            //{
                 System.IO.File.WriteAllText(storedSongsLoc, JsonConvert.SerializeObject(storedSongs, Formatting.Indented));
-            }
+            //}
         }
 
         public static void getStoredSongsList(DataGridView dgv, KeyValuePair<string, List<string>> dir)
         {
-            if (System.IO.File.Exists(storedSongsLoc))
-            {
-                storedSongs = JsonConvert.DeserializeObject<Dictionary<string,List<string>>>(System.IO.File.ReadAllText(storedSongsLoc));
-                foreach(KeyValuePair<string,List<string>> kvp in storedSongs)
-                {
-                    string[] array = kvp.Value.ToArray();
-                    dgv.Rows.Add(array[0], array[1], array[2], array[3], array[4], array[5], array[6], kvp.Key, array[7]);
-                }
-            }
-            else
-            {
+            //if (System.IO.File.Exists(storedSongsLoc))
+            //{
+            //    storedSongs = JsonConvert.DeserializeObject<Dictionary<string,List<string>>>(System.IO.File.ReadAllText(storedSongsLoc));
+            //    foreach(KeyValuePair<string,List<string>> kvp in storedSongs)
+            //    {
+            //        string[] array = kvp.Value.ToArray();
+           //         dgv.Rows.Add(array[0], array[1], array[2], array[3], array[4], array[5], array[6], kvp.Key, array[7], array[8]);
+            //    }
+            //}
+            //else
+          //  {
                 getMusicFiles(dgv,dir);
-            }
+           // }
         }
 
         public static void editMeta(Form1 form1,Form form2, string[] songData)

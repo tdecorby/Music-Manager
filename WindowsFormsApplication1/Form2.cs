@@ -36,6 +36,12 @@ namespace WindowsFormsApplication1
 
         private void Save_Click(object sender, EventArgs e)
         {
+            songData[0] = Title_textBox.Text;
+            songData[1] = Artist_textBox.Text;
+            songData[2] = Album_textBox.Text;
+            songData[3] = Genre_textBox.Text;
+            songData[4] = Track_textBox.Text;
+            songData[5] = Year_textBox.Text;
             fileLookup.editMeta(form1, this, songData);
         }
 

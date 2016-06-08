@@ -1,4 +1,6 @@
-﻿using Newtonsoft.Json;
+﻿using NAudio;
+using NAudio.Wave;
+using Newtonsoft.Json;
 using System;
 using System.Collections;
 using System.Collections.Generic;
@@ -10,7 +12,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using System.Windows.Forms;
-
+using Un4seen.Bass;
 
 namespace WindowsFormsApplication1
 {
@@ -20,24 +22,29 @@ namespace WindowsFormsApplication1
         private Dictionary<string, List<string>> directories;
         protected IrrKlang.ISoundEngine irrKlangEngine;
         protected IrrKlang.ISound currentlyPlayingSound;
+        protected IWavePlayer waveOutDevice;
+        protected AudioFileReader audioFileReader;
+        
         protected string playingSongLoc;
+        int title = 0, artist = 1, album = 2, genre = 3, track = 4, year = 5, size = 6, loc = 7, root = 8, columns = 10;
 
         public Form1()
         {
 
             InitializeComponent();
-            songList.ColumnCount = 9;
-            songList.Columns[0].Name = "Title";
-            songList.Columns[1].Name = "Artist";
-            songList.Columns[2].Name = "Album";
-            songList.Columns[3].Name = "Genre";
-            songList.Columns[4].Name = "Track";
-            songList.Columns[5].Name = "Year";
-            songList.Columns[6].Name = "Size";
-            songList.Columns[7].Name = "Location";
-            songList.Columns[8].Name = "Root";
-            songList.Columns[7].Visible = false;
-            songList.Columns[8].Visible = false;
+            songList.ColumnCount = columns;
+            songList.Columns[title].Name = "Title";
+            songList.Columns[artist].Name = "Artist";
+            songList.Columns[album].Name = "Album";
+            songList.Columns[genre].Name = "Genre";
+            songList.Columns[track].Name = "Track";
+            songList.Columns[year].Name = "Year";
+            songList.Columns[size].Name = "Size";
+            songList.Columns[loc].Name = "Location";
+            songList.Columns[root].Name = "Root";
+            songList.Columns[9].Name = "Length";
+            songList.Columns[loc].Visible = false;
+            songList.Columns[root].Visible = false;
             songList.SelectionMode = DataGridViewSelectionMode.FullRowSelect;
             songList.MultiSelect = true;
 
@@ -58,7 +65,7 @@ namespace WindowsFormsApplication1
             getSongs();
 
             irrKlangEngine = new IrrKlang.ISoundEngine();
-            
+            waveOutDevice = new WaveOut();
 
             songList.UserDeletingRow += songList_UserDeletingRow;
             songList.ClearSelection();
@@ -68,7 +75,7 @@ namespace WindowsFormsApplication1
 
         private void Play_Click(object sender, EventArgs e)
         {
-            if (currentlyPlayingSound != null && !currentlyPlayingSound.)
+            if (currentlyPlayingSound != null && !currentlyPlayingSound.Finished)
 			{
 				if (currentlyPlayingSound.Paused)
                 {
@@ -159,15 +166,27 @@ namespace WindowsFormsApplication1
 
         private void Stop_Click(object sender, EventArgs e)
         {
-            if (currentlyPlayingSound != null)
+            if (waveOutDevice != null)
             {
                 Play.Text = "Play";
                 playingLabel.Text = "";
-                currentlyPlayingSound.Stop();
+                waveOutDevice.Stop();
+                
+                //currentlyPlayingSound.Stop();
                 int c = songList.CurrentRow.Index;
                 songList.ClearSelection();
                 songList.Rows[c].Selected = true;
                 songList.Rows[c].Cells[0].Selected = true;
+                foreach (DataGridViewRow row in songList.Rows)
+                {
+                    foreach (DataGridViewCell cell in row.Cells)
+                    {
+                        
+                            cell.Style.ForeColor = Color.Black;
+                            cell.Style.SelectionForeColor = Color.Black;
+                        
+                    }
+                }
             }
                 
         }
@@ -186,21 +205,43 @@ namespace WindowsFormsApplication1
 
         private void playSong(string[] songInfo)
         {
-            
-            if (currentlyPlayingSound != null)
-                currentlyPlayingSound.Stop();
+
+            if (waveOutDevice.PlaybackState == PlaybackState.Playing)
+                waveOutDevice.Dispose();
             if (songInfo != null)
             {
+                waveOutDevice = new WaveOut();
                 Play.Text = "Pause";
                 StartTime.Text = "00:00";
                 ProgressBar.Value = 0;
                 playingLabel.Text = songInfo[0] + " by " + songInfo[1];
                 playingSongLoc = songInfo[6];
-                currentlyPlayingSound = irrKlangEngine.Play2D(playingSongLoc, false);
-                ProgressBar.Maximum = (int)currentlyPlayingSound.PlayLength;
-                TimeSpan t = TimeSpan.FromMilliseconds(currentlyPlayingSound.PlayLength);
+                audioFileReader = new AudioFileReader(songInfo[6]);
+                waveOutDevice.Init(audioFileReader);
+                waveOutDevice.Play();
+
+                //currentlyPlayingSound = irrKlangEngine.Play2D(playingSongLoc, false);
+                ProgressBar.Maximum = (int)audioFileReader.TotalTime.TotalMilliseconds;
+                TimeSpan t = audioFileReader.TotalTime;
                 EndTime.Text = string.Format("{0:D2}:{1:D2}",t.Minutes,t.Seconds);
                 InitTimer();
+                foreach (DataGridViewRow row in songList.Rows)
+                {
+                    foreach(DataGridViewCell cell in row.Cells)
+                    {
+                        if (row.Cells[loc].Value.ToString() == playingSongLoc)
+                        {
+                            cell.Style.ForeColor = Color.Blue;
+                            cell.Style.SelectionForeColor = Color.Blue;
+                        }
+                        else
+                        {
+                            cell.Style.ForeColor = Color.Black;
+                            cell.Style.SelectionForeColor = Color.Black;
+                        }
+                    }
+                }
+                
             }else
             {
                 MessageBox.Show("Error with Song address");
@@ -212,14 +253,14 @@ namespace WindowsFormsApplication1
         private string[] getParsedSongData(DataGridView songList)
         {
             string[] songInfo = new string[8];
-            songInfo[0] = (songList.SelectedCells[0].Value == null)? "Unknown" : songList.SelectedCells[0].Value.ToString();    //title
-            songInfo[1] = (songList.SelectedCells[1].Value == null)? "Unknown" : songList.SelectedCells[1].Value.ToString();    //artist
-            songInfo[2] = (songList.SelectedCells[2].Value == null) ? "Unknown" : songList.SelectedCells[2].Value.ToString();   //album
-            songInfo[3] = (songList.SelectedCells[3].Value == null) ? "Unknown" : songList.SelectedCells[3].Value.ToString();   //genre
-            songInfo[4] = (songList.SelectedCells[4].Value == null) ? "0" : songList.SelectedCells[4].Value.ToString();         // track
-            songInfo[5] = (songList.SelectedCells[5].Value == null) ? "0" : songList.SelectedCells[5].Value.ToString();         //year
-            songInfo[6] = (songList.SelectedCells[7].Value == null) ? null : songList.SelectedCells[7].Value.ToString();        //location
-            songInfo[7] = (songList.SelectedCells[8].Value == null) ? null : songList.SelectedCells[8].Value.ToString();        //root
+            songInfo[0] = (songList.SelectedCells[title].Value == null)? "Unknown" : songList.SelectedCells[title].Value.ToString();    //title
+            songInfo[1] = (songList.SelectedCells[artist].Value == null)? "Unknown" : songList.SelectedCells[artist].Value.ToString();    //artist
+            songInfo[2] = (songList.SelectedCells[album].Value == null) ? "Unknown" : songList.SelectedCells[album].Value.ToString();   //album
+            songInfo[3] = (songList.SelectedCells[genre].Value == null) ? "Unknown" : songList.SelectedCells[genre].Value.ToString();   //genre
+            songInfo[4] = (songList.SelectedCells[track].Value == null) ? "0" : songList.SelectedCells[track].Value.ToString();         // track
+            songInfo[5] = (songList.SelectedCells[year].Value == null) ? "0" : songList.SelectedCells[year].Value.ToString();         //year
+            songInfo[6] = (songList.SelectedCells[loc].Value == null) ? null : songList.SelectedCells[loc].Value.ToString();        //location
+            songInfo[7] = (songList.SelectedCells[root].Value == null) ? null : songList.SelectedCells[root].Value.ToString();        //root
             return songInfo;
         }
 
@@ -233,11 +274,18 @@ namespace WindowsFormsApplication1
 
         private void ProgressBarClick(object sender, MouseEventArgs e)
         {
-            if (currentlyPlayingSound != null)
+            if (waveOutDevice != null)
             {
-                uint x = Convert.ToUInt32(((double)e.X / (double)ProgressBar.Width) * (ProgressBar.Maximum - ProgressBar.Minimum));
-                currentlyPlayingSound.PlayPosition = x;
-                ProgressBar.Value = (int)x;
+                long x = (long)(e.X / (double)ProgressBar.Width) * (ProgressBar.Maximum - ProgressBar.Minimum);
+                TimeSpan t = new TimeSpan(x);
+                
+                ProgressBar.Value = t.Milliseconds;
+                //waveOutDevice.Dispose();
+                //waveOutDevice = new WaveOut();
+                //audioFileReader.Position += audioFileReader.WaveFormat.AverageBytesPerSecond * t.Milliseconds;
+                audioFileReader.CurrentTime = audioFileReader.CurrentTime.Add(t);
+                //waveOutDevice.Init(audioFileReader);
+                //waveOutDevice.Play();
             }
                 
         }
@@ -257,18 +305,22 @@ namespace WindowsFormsApplication1
         {
             timer1 = new Timer();
             timer1.Tick += new EventHandler(timer1_Tick);
-            timer1.Interval = 10; // in miliseconds
+            timer1.Interval = 1; // in miliseconds
             timer1.Start();
         }
 
         private void timer1_Tick(object sender, EventArgs e)
         {
-            if (currentlyPlayingSound != null)
+            if (waveOutDevice != null)
             {
                 try
                 {
-                    ProgressBar.Value = (int)currentlyPlayingSound.PlayPosition;
-                    TimeSpan t = TimeSpan.FromMilliseconds(currentlyPlayingSound.PlayPosition);
+                    if (waveOutDevice.PlaybackState == PlaybackState.Stopped && Play.Text == "Pause")
+                    {
+                        playSong(fileLookup.getNextSong());
+                    }
+                    ProgressBar.Value = (int)audioFileReader.CurrentTime.TotalMilliseconds;
+                    TimeSpan t = audioFileReader.CurrentTime;
                     StartTime.Text = string.Format("{0:D2}:{1:D2}", t.Minutes, t.Seconds);
                 }
                 catch (Exception error)
